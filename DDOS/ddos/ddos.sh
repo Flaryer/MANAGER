@@ -39,28 +39,24 @@ showhelp()
 
 unbanip()
 {
-	UNBAN_SCRIPT=`mktemp /tmp/unban.XXXXXXXX`
-	TMP_FILE=`mktemp /tmp/unban.XXXXXXXX`
-	UNBAN_IP_LIST=`mktemp /tmp/unban.XXXXXXXX`
-	echo '#!/bin/sh' > $UNBAN_SCRIPT
-	echo "sleep $BAN_PERIOD" >> $UNBAN_SCRIPT
-	if [ $APF_BAN -eq 1 ]; then
-		while read line; do
-			echo "$APF -u $line" >> $UNBAN_SCRIPT
-			echo $line >> $UNBAN_IP_LIST
-		done < $BANNED_IP_LIST
-	else
-		while read line; do
-			echo "$IPT -D INPUT -s $line -j DROP" >> $UNBAN_SCRIPT
-			echo $line >> $UNBAN_IP_LIST
-		done < $BANNED_IP_LIST
-	fi
-	echo "grep -v --file=$UNBAN_IP_LIST $IGNORE_IP_LIST > $TMP_FILE" >> $UNBAN_SCRIPT
-	echo "mv $TMP_FILE $IGNORE_IP_LIST" >> $UNBAN_SCRIPT
-	echo "rm -f $UNBAN_SCRIPT" >> $UNBAN_SCRIPT
-	echo "rm -f $UNBAN_IP_LIST" >> $UNBAN_SCRIPT
-	echo "rm -f $TMP_FILE" >> $UNBAN_SCRIPT
-	. $UNBAN_SCRIPT &
+    TMP_FILE=`mktemp /tmp/unban.XXXXXXXX`
+    while read line; do
+        CURR_LINE_IP=$(echo $line | cut -d" " -f1)
+        CURR_LINE_UNBAN_TIME=$(echo $line | cut -d" " -f2)
+        CURR_TIME=`date +%s`
+        echo $CURR_LINE_UNBAN_TIME
+        if [ "$CURR_LINE_UNBAN_TIME" -le "$CURR_TIME" ]; then
+            if [ $APF_BAN -eq 1 ]; then
+                $APF -u $CURR_LINE_IP
+            else
+                $IPT -D INPUT -s $CURR_LINE_IP -j DROP
+            fi
+        else
+            echo $line >> $TMP_FILE
+            continue
+        fi
+    done < $PENDING_UNBAN_LIST
+    mv $TMP_FILE $PENDING_UNBAN_LIST -f
 }
 
 add_to_cron()
@@ -131,7 +127,8 @@ if [ $KILL -eq 1 ]; then
 		IP_BAN_NOW=1
 		echo "$CURR_LINE_IP with $CURR_LINE_CONN connections" >> $BANNED_IP_MAIL
 		echo $CURR_LINE_IP >> $BANNED_IP_LIST
-		echo $CURR_LINE_IP >> $IGNORE_IP_LIST
+        let UNBAN_TIME=`date +%s`+$BAN_PERIOD
+        echo "${CURR_LINE_IP} ${UNBAN_TIME}" >> $PENDING_UNBAN_LIST
 		if [ $APF_BAN -eq 1 ]; then
 			$APF -d $CURR_LINE_IP
 		else
