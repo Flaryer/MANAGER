@@ -44,14 +44,20 @@ unbanip()
         CURR_LINE_IP=$(echo $line | cut -d" " -f1)
         CURR_LINE_UNBAN_TIME=$(echo $line | cut -d" " -f2)
         CURR_TIME=`date +%s`
-        echo $CURR_LINE_UNBAN_TIME
+		CURR_IPT=`$IPT -nL`
         if [ "$CURR_LINE_UNBAN_TIME" -le "$CURR_TIME" ]; then
+			echo RELEASE $CURR_LINE_IP
             if [ $APF_BAN -eq 1 ]; then
                 $APF -u $CURR_LINE_IP
             else
                 $IPT -D INPUT -s $CURR_LINE_IP -j DROP
             fi
         else
+		    RES=`echo "$CURR_IPT" | grep -c "$CURR_LINE_IP"`
+			if [ $RES -eq "0" ]; then
+				echo REBAN $CURR_LINE_IP
+				$IPT -I INPUT -s $CURR_LINE_IP -j DROP
+			fi
             echo $line >> $TMP_FILE
             continue
         fi
@@ -120,8 +126,14 @@ if [ $KILL -eq 1 ]; then
 		if [ $CURR_LINE_CONN -lt $NO_OF_CONNECTIONS ]; then
 			break
 		fi
-		IGNORE_BAN=`grep -c $CURR_LINE_IP $IGNORE_IP_LIST`
-		if [ $IGNORE_BAN -ge 1 ]; then
+		SKIP_BAN=`grep -c $CURR_LINE_IP $IGNORE_IP_LIST`
+		if [ $SKIP_BAN -ge 1 ]; then
+			echo SKIP WHITELIST IP $CURR_LINE_IP
+			continue
+		fi
+		SKIP_BAN=`grep -c $CURR_LINE_IP $PENDING_UNBAN_LIST`
+		if [ $SKIP_BAN -ge 1 ]; then
+			echo SKIP BANNED IP $CURR_LINE_IP
 			continue
 		fi
 		IP_BAN_NOW=1
@@ -129,6 +141,7 @@ if [ $KILL -eq 1 ]; then
 		echo $CURR_LINE_IP >> $BANNED_IP_LIST
         let UNBAN_TIME=`date +%s`+$BAN_PERIOD
         echo "${CURR_LINE_IP} ${UNBAN_TIME}" >> $PENDING_UNBAN_LIST
+		echo BAN $CURR_LINE_IP
 		if [ $APF_BAN -eq 1 ]; then
 			$APF -d $CURR_LINE_IP
 		else
@@ -140,7 +153,7 @@ if [ $KILL -eq 1 ]; then
 		if [ $EMAIL_TO != "" ]; then
 			cat $BANNED_IP_MAIL | mail -s "IP addresses banned on $dt" $EMAIL_TO
 		fi
-		unbanip
 	fi
+	unbanip
 fi
 rm -f $TMP_PREFIX.*
