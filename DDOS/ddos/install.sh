@@ -16,7 +16,7 @@ wget -q -O /usr/local/ddos/ignore.ip.list http://www.inetbase.com/scripts/ddos/i
 echo -n '.'
 wget -q -O /usr/local/ddos/ddos.sh http://www.inetbase.com/scripts/ddos/ddos.sh
 chmod 0755 /usr/local/ddos/ddos.sh
-cp -s /usr/local/ddos/ddos.sh /usr/local/sbin/ddos
+ln -s /usr/local/ddos/ddos.sh /usr/local/sbin/ddos
 echo '...done'
 
 echo; echo -n 'Creating cron to run script every minute.....(Default setting)'

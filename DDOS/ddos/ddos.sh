@@ -40,12 +40,12 @@ showhelp()
 unbanip()
 {
     TMP_FILE=`mktemp /tmp/unban.XXXXXXXX`
+	CURR_TIMESTAMP=`date +%s`
+	CURR_IPT=`$IPT -nL`
     while read line; do
         CURR_LINE_IP=$(echo $line | cut -d" " -f1)
-        CURR_LINE_UNBAN_TIME=$(echo $line | cut -d" " -f2)
-        CURR_TIME=`date +%s`
-		CURR_IPT=`$IPT -nL`
-        if [ "$CURR_LINE_UNBAN_TIME" -le "$CURR_TIME" ]; then
+        CURR_LINE_UNBAN_TIMESTAMP=$(echo $line | cut -d" " -f2)
+        if [ "$CURR_LINE_UNBAN_TIMESTAMP" -le "$CURR_TIMESTAMP" ]; then
 			echo RELEASE $CURR_LINE_IP
             if [ $APF_BAN -eq 1 ]; then
                 $APF -u $CURR_LINE_IP
@@ -74,6 +74,8 @@ add_to_cron()
 	echo "SHELL=/bin/sh" > $CRON
 	if [ $FREQ -le 2 ]; then
 		echo "0-59/$FREQ * * * * root /usr/local/ddos/ddos.sh >/dev/null 2>&1" >> $CRON
+		echo "0-59/$FREQ * * * * root sleep 30s; /usr/local/ddos/ddos.sh >/dev/null 2>&1" >> $CRON
+
 	else
 		let "START_MINUTE = $RANDOM % ($FREQ - 1)"
 		let "START_MINUTE = $START_MINUTE + 1"
@@ -113,7 +115,7 @@ TMP_PREFIX='/tmp/ddos'
 TMP_FILE="mktemp $TMP_PREFIX.XXXXXXXX"
 BANNED_IP_MAIL=`$TMP_FILE`
 BANNED_IP_LIST=`$TMP_FILE`
-echo "Banned the following ip addresses on `date`" > $BANNED_IP_MAIL
+echo "${LOCAL_IP} banned the following ip addresses on `date +"%F %T"`" > $BANNED_IP_MAIL
 echo >>	$BANNED_IP_MAIL
 BAD_IP_LIST=`$TMP_FILE`
 netstat -ntu | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -nr > $BAD_IP_LIST
@@ -139,8 +141,8 @@ if [ $KILL -eq 1 ]; then
 		IP_BAN_NOW=1
 		echo "$CURR_LINE_IP with $CURR_LINE_CONN connections" >> $BANNED_IP_MAIL
 		echo $CURR_LINE_IP >> $BANNED_IP_LIST
-        let UNBAN_TIME=`date +%s`+$BAN_PERIOD
-        echo "${CURR_LINE_IP} ${UNBAN_TIME}" >> $PENDING_UNBAN_LIST
+        let UNBAN_TIMESTAMP=`date +%s`+$BAN_PERIOD
+        echo "${CURR_LINE_IP} ${UNBAN_TIMESTAMP}" >> $PENDING_UNBAN_LIST
 		echo BAN $CURR_LINE_IP
 		if [ $APF_BAN -eq 1 ]; then
 			$APF -d $CURR_LINE_IP
@@ -149,7 +151,7 @@ if [ $KILL -eq 1 ]; then
 		fi
 	done < $BAD_IP_LIST
 	if [ $IP_BAN_NOW -eq 1 ]; then
-		dt=`date`
+		dt=`date +"%F %T"`
 		if [ $EMAIL_TO != "" ]; then
 			cat $BANNED_IP_MAIL | mail -s "IP addresses banned on $dt" $EMAIL_TO
 		fi
